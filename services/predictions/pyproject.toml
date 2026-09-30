@@ -1,0 +1,32 @@
+[project]
+name = "prediction-service"
+version = "0.1.0"
+description = "Soccer market probabilities and value bets: ML library, pipelines and API."
+requires-python = ">=3.12"
+dependencies = [
+    "platform-common",
+    "uvicorn[standard]==0.32.*",
+    "httpx==0.27.*",
+    "numpy>=2.1",
+    "scipy>=1.14",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "scikit-learn>=1.5",
+    "lightgbm>=4.5",
+]
+
+[tool.uv.sources]
+platform-common = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+predict-ingest = "predictor.pipelines.ingest:main"
+predict-train = "predictor.pipelines.train:main"
+predict-backtest = "predictor.pipelines.backtest:main"
+predict-run = "predictor.pipelines.predict:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/predictor", "src/prediction_service"]

@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+# Exported odds, ingested matches, trained models and picks: regenerable, often large.
+data/
+artifacts/

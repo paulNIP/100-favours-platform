@@ -1,0 +1,13 @@
+[project]
+name = "platform-common"
+version = "0.1.0"
+description = "Shared FastAPI building blocks: app factory, settings base, upstream errors."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.*",
+    "pydantic-settings==2.6.*",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

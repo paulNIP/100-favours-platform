@@ -1,0 +1,94 @@
+# Images build from the repo root so each can include libs/common and uv.lock.
+# Each service gets only the variables it needs, not the whole .env.
+x-healthcheck: &http-health
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+  interval: 10s
+  timeout: 3s
+  retries: 3
+
+services:
+  gateway:
+    build: { context: ., dockerfile: services/gateway/Dockerfile }
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICES: '{"odds": "http://odds-service:8000", "notifications": "http://notification-service:8000", "predictions": "http://prediction-service:8000"}'
+      WORKERS: 2
+    depends_on:
+      odds-service: { condition: service_healthy }
+      notification-service: { condition: service_healthy }
+      prediction-service: { condition: service_healthy }
+    healthcheck: *http-health
+
+  odds-service:
+    build: { context: ., dockerfile: services/odds/Dockerfile }
+    # No published port: only reachable through the gateway on the internal network.
+    # Scale horizontally with: docker compose up --scale odds-service=3
+    # Exports run as one-off jobs: docker compose run --rm odds-service odds-export
+    environment:
+      ODDSPAPI_KEY: ${ODDSPAPI_KEY:?set ODDSPAPI_KEY in .env}
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-odds}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-odds}
+      ODDS_DATA_DIR: /srv/data/odds
+      WORKERS: 2
+    volumes:
+      - odds-data:/srv/data
+    depends_on:
+      redis: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    healthcheck: *http-health
+
+  notification-service:
+    build: { context: ., dockerfile: services/notifications/Dockerfile }
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env}
+      TELEGRAM_DEFAULT_CHAT_ID: ${TELEGRAM_DEFAULT_CHAT_ID:-}
+      WORKERS: 2
+    healthcheck: *http-health
+
+  prediction-service:
+    build: { context: ., dockerfile: services/predictions/Dockerfile }
+    # Serves the latest trained model. Pipelines run as one-off jobs sharing the volumes:
+    #   docker compose run --rm prediction-service predict-ingest --leagues E0 E1
+    environment:
+      DATA_DIR: /srv/data
+      ARTIFACTS_DIR: /srv/artifacts
+      NOTIFICATION_URL: http://notification-service:8000
+      MODEL_NAME: dixon_coles
+      WORKERS: 2
+    volumes:
+      - prediction-data:/srv/data
+      - prediction-artifacts:/srv/artifacts
+    healthcheck: *http-health
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-odds}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-odds}
+    # Loopback only, for scripts/psql/IDE from the host; 5433 because a local
+    # Postgres commonly already has 5432.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres-data:
+  odds-data:
+  prediction-data:
+  prediction-artifacts:

@@ -1,0 +1,24 @@
+[project]
+name = "odds-service"
+version = "0.1.0"
+description = "OddsPapi wrapper with shared cache, plus stored fixtures/odds in Postgres."
+requires-python = ">=3.12"
+dependencies = [
+    "platform-common",
+    "uvicorn[standard]==0.32.*",
+    "httpx==0.27.*",
+    "redis==5.2.*",
+    "psycopg[binary]==3.2.*",
+    "psycopg-pool==3.2.*",
+]
+
+[tool.uv.sources]
+platform-common = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+odds-export = "odds_service.scripts.export_odds:main"
+odds-import-json = "odds_service.scripts.import_json:main"
